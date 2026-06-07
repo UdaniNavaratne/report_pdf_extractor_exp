@@ -1,0 +1,34 @@
+# Python
+
+**pycache**/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+
+venv/
+.env/
+
+# API Keys
+
+.env
+
+# Company PDFs
+
+*.pdf
+
+# Generated Outputs
+
+*.json
+
+# VS Code
+
+.vscode/
+
+# OS files
+
+.DS_Store
+Thumbs.db
+
+data/
