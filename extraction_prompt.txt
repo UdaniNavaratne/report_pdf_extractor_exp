@@ -137,6 +137,12 @@ This task's total cost = Total USD ad spend × exchange rate × 0.15 (15% agency
 
 ---
 
+## STEP 6B — TRACK SLIDE NUMBERS
+
+For every piece of information you extract, note the slide or page number in the PDF where you found it. Include this as a "slide" field on each line item, adhoc item, and the management fee. If a single line item is supported by data from multiple slides, list all of them separated by commas (e.g. "3, 7"). If you cannot determine the slide number, use null.
+
+---
+
 ## STEP 7 — IMPORTANT RULES
 
 1. ONLY include line items where quantity > 0. Do not include zero-quantity rows.
@@ -164,20 +170,23 @@ Respond ONLY with valid JSON, no markdown, no explanation:
       "quantity": number,
       "unit_cost": number or null,
       "total_cost": number,
-      "notes": "string or empty"
+      "notes": "string or empty",
+      "slide": "slide number(s) as string, e.g. '3' or '3, 7', or null if unknown"
     }
   ],
   "adhoc_items": [
     {
       "description": "exact wording from report",
       "quantity": number,
-      "notes": "string"
+      "notes": "string",
+      "slide": "slide number(s) as string or null"
     }
   ],
   "management_fee": {
     "description": "full description as written in report or null",
     "unit_cost": number or null,
-    "total_cost": number or null
+    "total_cost": number or null,
+    "slide": "slide number(s) as string or null"
   },
   "confidence": "high|medium|low",
   "warnings": ["list any fields that were missing, assumed, or unclear"]

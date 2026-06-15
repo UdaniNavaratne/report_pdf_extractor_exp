@@ -135,6 +135,17 @@
     .task-notes { font-size: 11px; color: #94a3b8; margin-top: 3px; }
     .total-row td { background: #f8fafc; font-weight: 700; font-size: 14px; border-bottom: none; border-top: 2px solid #e2e8f0; }
 
+    .slide-badge {
+      display: inline-block;
+      background: #eff6ff; color: #1d4ed8;
+      border: 1px solid #bfdbfe;
+      border-radius: 4px; padding: 2px 7px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .slide-badge:hover { background: #dbeafe; }
+    .slide-unknown { color: #cbd5e1; font-size: 13px; }
+
     /* JSON */
     .json-card { background: #0f172a; border-radius: 12px; border: 1px solid #1e293b; overflow: hidden; }
     .json-header {
@@ -155,6 +166,86 @@
       font-family: 'Fira Code', 'Cascadia Code', 'Courier New', monospace;
       overflow-x: auto; max-height: 400px; overflow-y: auto; line-height: 1.7;
     }
+
+    /* ── Slide Navigator ── */
+    .slide-nav {
+      display: none;
+      background: #fff; border-radius: 12px;
+      border: 1px solid #e2e8f0; overflow: hidden;
+    }
+    .slide-nav-header {
+      padding: 14px 20px; border-bottom: 1px solid #f1f5f9;
+      font-weight: 600; color: #0f172a; font-size: 14px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .slide-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      padding: 16px;
+    }
+    .slide-thumb {
+      position: relative; cursor: pointer;
+      border-radius: 8px; overflow: hidden;
+      border: 2px solid #e2e8f0;
+      transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+      background: #f8fafc;
+    }
+    .slide-thumb:hover {
+      border-color: #3b82f6;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+    }
+    .slide-thumb.highlighted { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+    .slide-thumb canvas { display: block; width: 100%; height: auto; }
+    .slide-num {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(15,23,42,0.7); color: #fff;
+      font-size: 11px; font-weight: 600; text-align: center;
+      padding: 4px 0; letter-spacing: 0.04em;
+    }
+    .slide-thumb-loading {
+      height: 90px; display: flex; align-items: center;
+      justify-content: center; color: #cbd5e1; font-size: 11px;
+    }
+
+    /* ── Lightbox ── */
+    .lightbox {
+      display: none; position: fixed;
+      inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.85);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 16px;
+      padding: 24px;
+    }
+    .lightbox.open { display: flex; }
+    .lightbox-inner {
+      position: relative; max-width: 880px; width: 100%;
+      background: #fff; border-radius: 12px; overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .lightbox-inner canvas { display: block; width: 100%; height: auto; }
+    .lightbox-close {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(0,0,0,0.5); color: #fff;
+      border: none; border-radius: 50%;
+      width: 32px; height: 32px; font-size: 18px;
+      cursor: pointer; line-height: 32px; text-align: center;
+      transition: background 0.15s;
+    }
+    .lightbox-close:hover { background: rgba(0,0,0,0.8); }
+    .lightbox-nav {
+      display: flex; align-items: center; gap: 16px;
+      color: #fff; font-size: 14px; font-weight: 500;
+    }
+    .lightbox-btn {
+      background: rgba(255,255,255,0.15); color: #fff;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 8px; padding: 8px 20px;
+      font-size: 14px; cursor: pointer; transition: background 0.15s;
+    }
+    .lightbox-btn:hover { background: rgba(255,255,255,0.25); }
+    .lightbox-btn:disabled { opacity: 0.3; cursor: default; }
   </style>
 </head>
 <body>
@@ -185,8 +276,17 @@
     Reading report and extracting data…
   </div>
 
+  <!-- Slide Navigator (shows after file is picked) -->
+  <div class="slide-nav" id="slide-nav">
+    <div class="slide-nav-header">
+      <span>Slides</span>
+      <span class="card-header-sub" id="slide-nav-count"></span>
+    </div>
+    <div class="slide-grid" id="slide-grid"></div>
+  </div>
+
   <!-- Results -->
-  <div class="results" id="results">
+  <div class="results" id="results" style="margin-top:16px;">
 
     <div class="card">
       <div class="card-header">Summary</div>
@@ -221,6 +321,7 @@
           <thead>
             <tr>
               <th style="text-align:left;">Task</th>
+              <th>Slide</th>
               <th>Qty</th>
               <th>Unit Cost (LKR)</th>
               <th>Total (LKR)</th>
@@ -242,9 +343,29 @@
   </div>
 </div>
 
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="closeLightboxOnBg(event)">
+  <div class="lightbox-inner" id="lightbox-inner">
+    <canvas id="lightbox-canvas"></canvas>
+    <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  </div>
+  <div class="lightbox-nav">
+    <button class="lightbox-btn" id="lb-prev" onclick="lightboxNav(-1)">← Prev</button>
+    <span id="lb-label">Slide 1 of 13</span>
+    <button class="lightbox-btn" id="lb-next" onclick="lightboxNav(1)">Next →</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
   let currentFile = null;
   let currentResult = null;
+  let pdfDoc = null;
+  let totalPages = 0;
+  let lightboxPage = 1;
 
   function setFile(file) {
     if (!file || !file.name.endsWith('.pdf')) { showError('Please upload a PDF file.'); return; }
@@ -255,6 +376,93 @@
     document.getElementById('dz-sub').textContent = `${(file.size / 1024).toFixed(0)} KB · Click to change`;
     document.getElementById('extract-btn').disabled = false;
     hideError();
+    loadPDFThumbnails(file);
+  }
+
+  async function loadPDFThumbnails(file) {
+    const nav = document.getElementById('slide-nav');
+    const grid = document.getElementById('slide-grid');
+    const countEl = document.getElementById('slide-nav-count');
+    grid.innerHTML = '';
+    nav.style.display = 'block';
+
+    const arrayBuffer = await file.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    totalPages = pdfDoc.numPages;
+    countEl.textContent = totalPages + ' slides';
+
+    for (let i = 1; i <= totalPages; i++) {
+      const thumb = document.createElement('div');
+      thumb.className = 'slide-thumb';
+      thumb.id = `thumb-${i}`;
+      thumb.innerHTML = `<div class="slide-thumb-loading">loading…</div><div class="slide-num">Slide ${i}</div>`;
+      thumb.onclick = () => openLightbox(i);
+      grid.appendChild(thumb);
+      renderThumb(i, thumb);
+    }
+  }
+
+  async function renderThumb(pageNum, container) {
+    const page = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 0.35 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    container.innerHTML = `<div class="slide-num">Slide ${pageNum}</div>`;
+    container.insertBefore(canvas, container.firstChild);
+  }
+
+  async function openLightbox(pageNum) {
+    lightboxPage = pageNum;
+    document.getElementById('lightbox').classList.add('open');
+    await renderLightboxPage(pageNum);
+  }
+
+  async function renderLightboxPage(pageNum) {
+    const page = await pdfDoc.getPage(pageNum);
+    const canvas = document.getElementById('lightbox-canvas');
+    const maxW = Math.min(window.innerWidth - 80, 880);
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = maxW / viewport.width;
+    const scaled = page.getViewport({ scale });
+    canvas.width = scaled.width;
+    canvas.height = scaled.height;
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaled }).promise;
+    document.getElementById('lb-label').textContent = `Slide ${pageNum} of ${totalPages}`;
+    document.getElementById('lb-prev').disabled = pageNum <= 1;
+    document.getElementById('lb-next').disabled = pageNum >= totalPages;
+  }
+
+  async function lightboxNav(dir) {
+    const next = lightboxPage + dir;
+    if (next < 1 || next > totalPages) return;
+    lightboxPage = next;
+    await renderLightboxPage(lightboxPage);
+  }
+
+  function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+  function closeLightboxOnBg(e) { if (e.target === document.getElementById('lightbox')) closeLightbox(); }
+
+  document.addEventListener('keydown', e => {
+    if (!document.getElementById('lightbox').classList.contains('open')) return;
+    if (e.key === 'Escape') closeLightbox();
+    if (e.key === 'ArrowLeft') lightboxNav(-1);
+    if (e.key === 'ArrowRight') lightboxNav(1);
+  });
+
+  function highlightSlide(slideStr) {
+    // Remove old highlights
+    document.querySelectorAll('.slide-thumb.highlighted').forEach(el => el.classList.remove('highlighted'));
+    if (!slideStr) return;
+    const nums = slideStr.toString().split(',').map(s => parseInt(s.trim())).filter(Boolean);
+    nums.forEach(n => {
+      const el = document.getElementById(`thumb-${n}`);
+      if (el) { el.classList.add('highlighted'); }
+    });
+    // Scroll first highlighted thumb into view
+    const first = document.getElementById(`thumb-${nums[0]}`);
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function onFileChange(e) { setFile(e.target.files[0]); }
@@ -329,13 +537,16 @@
             ${item.task}
             ${item.notes ? `<div class="task-notes">${item.notes}</div>` : ''}
           </td>
+          <td>${item.slide
+            ? `<span class="slide-badge" onclick="handleSlideBadge('${item.slide}')">p.${item.slide}</span>`
+            : '<span class="slide-unknown">—</span>'}</td>
           <td>${item.quantity}</td>
           <td>${Number(item.unit_cost).toLocaleString()}</td>
           <td><strong>${Number(item.total_cost).toLocaleString()}</strong></td>
         </tr>
       `).join('') +
       `<tr class="total-row">
-        <td colspan="3">Total Marcom Cost for the Month</td>
+        <td colspan="4">Total Marcom Cost for the Month</td>
         <td>${total.toLocaleString()}</td>
       </tr>`;
 
@@ -344,6 +555,16 @@
     const results = document.getElementById('results');
     results.style.display = 'flex';
     results.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function handleSlideBadge(slideStr) {
+    // Highlight in navigator and scroll to it
+    highlightSlide(slideStr);
+    document.getElementById('slide-nav').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // If only one slide number, open lightbox directly
+    const nums = slideStr.toString().split(',').map(s => parseInt(s.trim())).filter(Boolean);
+    if (nums.length === 1 && pdfDoc) openLightbox(nums[0]);
   }
 
   function copyJSON() {

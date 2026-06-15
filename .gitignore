@@ -8,6 +8,7 @@
 # Virtual Environment
 
 venv/
+meta_env/
 .env/
 
 # API Keys
